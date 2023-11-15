@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+service extenion {
+    rpc ExtData(ExtensionResponse) returns ExtensionRequest;
+}
+
+message ExtensionResponse{
+    
+}
