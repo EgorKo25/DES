@@ -94,8 +94,8 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 
 			userExtendedData := fastjson.MustParseBytes(d)
 
-			dataTo := userExtendedData.Get("dataTo")
-			dataFrom := userExtendedData.Get("dataFrom")
+			dateTo := userExtendedData.Get("dateTo")
+			dateFrom := userExtendedData.Get("dateFrom")
 
 			childCtx, cancel := context.WithTimeout(ctx, time.Duration(wp.maxResponseTime)*time.Second)
 
@@ -110,21 +110,27 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			data := userExtendedData.GetArray("data")[0]
 			data.Set("personalIds", a.NewArray())
 			data.Get("personIds").SetArrayItem(0, data.Get("id"))
-			data.Set("dataFrom", dataFrom)
-			data.Set("dataTo", dataTo)
+			data.Set("dateFrom", dateFrom)
+			data.Set("dateTo", dateTo)
 
 			if body, err = wp.processRequest(childCtx, wp.urlStatusAbv, data, body); err != nil {
-				wp.logger.Errorf("cant create new request! error: %v", err)
-				childCh <- []byte(`{"status":"BAD REQUEST"}`)
+				wp.logger.Errorf("%v", err)
+				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
 				continue
 			}
-
-			userExtendedData = fastjson.MustParseBytes(body)
+			//TODO:Обработка ответов стороннего сервера
+			//TODO:НЕизвестный ответ сервера
+			userExtendedData, err = fastjson.ParseBytes(body)
+			if err != nil {
+				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				continue
+			}
 
 			data.Del("personalIds")
 
 			data.Set("displayName", a.NewString(string(data.GetStringBytes("displayName"))+
 				wp.setSmile(userExtendedData.GetArray("data")[0].GetInt("reasonId"))))
+			data.Set("status", a.NewString("OK"))
 
 			childCh <- data.MarshalTo(d[:0])
 
