@@ -73,8 +73,6 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 	a := fastjson.Arena{}
 	body := make([]byte, 0)
 
-	var err error
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -92,7 +90,11 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 				continue
 			}
 
-			userExtendedData := fastjson.MustParseBytes(d)
+			userExtendedData, err := fastjson.ParseBytes(d)
+			if err != nil {
+				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				continue
+			}
 
 			dateTo := userExtendedData.Get("dateTo")
 			dateFrom := userExtendedData.Get("dateFrom")
@@ -164,6 +166,9 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 		return nil, err
 	}
 
+	//TODO
+	req.Header.Set("Authorization", "")
+
 	resp, err := wp.client.Do(req)
 	if err != nil {
 		wp.logger.Errorf(clientError)
@@ -172,6 +177,12 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 
 	if resp.StatusCode != http.StatusOK {
 		wp.logger.Errorf(httpError)
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return nil, errors.New("UNAUTHORIZED")
+		case http.StatusBadRequest:
+			return nil, errors.New("BAD REQUEST")
+		}
 		return nil, errors.New(httpError)
 	}
 
