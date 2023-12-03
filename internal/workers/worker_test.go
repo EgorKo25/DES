@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +35,7 @@ func TestWorkerPull(t *testing.T) {
 		maxWorkers := 5
 		timeOutConn := 10
 
-		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar)
+		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar, "", "")
 
 		if client == nil {
 			t.Fatal("Expected a non-nil client, got nil")
@@ -50,14 +51,14 @@ func TestWorkerPull(t *testing.T) {
 		maxWorkers := 5
 		timeOutConn := 10
 
-		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar)
+		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar, "", "")
 		require.Nil(t, client)
 	})
 
 	t.Log("Проверка функциональности при разных входных значениях при помощи эхо-сервера")
 	type in struct {
 		resonalId     int
-		authorization string
+		authorization Auth
 		channel       chan chan []byte
 		// UserDate
 		email    string
@@ -102,8 +103,11 @@ func TestWorkerPull(t *testing.T) {
 				status: `"UNAUTHORIZED"`,
 			},
 			in: in{
-				resonalId:     0,
-				authorization: "admin:admin",
+				resonalId: 0,
+				authorization: Auth{
+					login:    "admin",
+					password: "admin",
+				},
 
 				email:    "petrovich@mail.ru",
 				dateFrom: "10.20.30",
@@ -118,8 +122,11 @@ func TestWorkerPull(t *testing.T) {
 				status: `"BAD REQUEST"`,
 			},
 			in: in{
-				resonalId:     0,
-				authorization: "",
+				resonalId: 0,
+				authorization: Auth{
+					login:    "admin",
+					password: "admin",
+				},
 
 				displayName: "Иванов Семен Петрович",
 			},
@@ -130,9 +137,8 @@ func TestWorkerPull(t *testing.T) {
 				status: `"INTERNAL SERVER ERROR"`,
 			},
 			in: in{
-				resonalId:     0,
-				authorization: "",
-				email:         `"petrovich@mail.ru"`,
+				resonalId: 0,
+				email:     `"petrovich@mail.ru"`,
 
 				displayName: `"Иванов"" ,}Семен "Петрович"`,
 			},
@@ -153,9 +159,17 @@ func TestWorkerPull(t *testing.T) {
 
 			resonalIds = tt.in.resonalId
 			displayName = tt.in.displayName
-			authorization = tt.in.authorization
+			authorization = base64.StdEncoding.EncodeToString([]byte(
+				fmt.Sprintf("%s:%s", tt.in.authorization.login, tt.in.authorization.password)),
+			)
 
-			workerPull := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar)
+			workerPull := NewWorkerPull(ctx, channel,
+				maxWorkers, timeOutConn,
+				3, sugar,
+				tt.in.authorization.login,
+				tt.in.authorization.password,
+			)
+
 			require.NotNilf(t, workerPull, "worker pull is nil!")
 
 			workerPull.urlExtData = server.URL + "/Portal/springApi/api/employees"
@@ -168,7 +182,6 @@ func TestWorkerPull(t *testing.T) {
 
 			v := fastjson.MustParseBytes(<-resultChan)
 			close(resultChan)
-			cancel()
 
 			require.Equal(t, tt.want.status, v.Get("status").String())
 			if v.Exists("id", "email", "displayName") {
@@ -178,7 +191,6 @@ func TestWorkerPull(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 // NewTestServer возвращает эхо-серер для тестов
@@ -200,7 +212,6 @@ func NewTestServer() *httptest.Server {
 			return
 		}
 
-		//TODO:
 		v, err := fastjson.ParseBytes(body)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -225,7 +236,6 @@ func NewTestServer() *httptest.Server {
 	mux.HandleFunc("/Portal/springApi/api/employees", func(w http.ResponseWriter, r *http.Request) {
 
 		auth := r.Header.Get("Authorization")
-
 		if auth != authorization {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -239,11 +249,13 @@ func NewTestServer() *httptest.Server {
 
 		v, err := fastjson.ParseBytes(body)
 		if err != nil {
+			sugar.Errorf("cannot read resp body - %s", v.String())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if v.Exists("email") {
+		if str := v.Get("email"); str.String() != "" {
+			sugar.Errorf("have not key email in resp body - %s", v.String())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
