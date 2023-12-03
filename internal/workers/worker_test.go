@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -64,6 +63,8 @@ func TestWorkerPull(t *testing.T) {
 		email    string
 		dateTo   string
 		dateFrom string
+		// Config Test server
+		displayName string
 	}
 
 	type want struct {
@@ -91,6 +92,49 @@ func TestWorkerPull(t *testing.T) {
 				email:    "petrovich@mail.ru",
 				dateFrom: "10.20.30",
 				dateTo:   "1/2/3",
+
+				displayName: "Иванов Семен Петрович",
+			},
+		},
+		{
+			name: "Unauthorized test case",
+			want: want{
+				status: `"UNAUTHORIZED"`,
+			},
+			in: in{
+				resonalId:     0,
+				authorization: "admin:admin",
+
+				email:    "petrovich@mail.ru",
+				dateFrom: "10.20.30",
+				dateTo:   "1/2/3",
+
+				displayName: "Иванов Семен Петрович",
+			},
+		},
+		{
+			name: "Request without email test case",
+			want: want{
+				status: `"BAD REQUEST"`,
+			},
+			in: in{
+				resonalId:     0,
+				authorization: "",
+
+				displayName: "Иванов Семен Петрович",
+			},
+		},
+		{
+			name: "Wrong http response test case",
+			want: want{
+				status: `"INTERNAL SERVER ERROR"`,
+			},
+			in: in{
+				resonalId:     0,
+				authorization: "",
+				email:         `"petrovich@mail.ru"`,
+
+				displayName: `"Иванов"" ,}Семен "Петрович"`,
 			},
 		},
 	}
@@ -98,20 +142,24 @@ func TestWorkerPull(t *testing.T) {
 	channel := make(chan chan []byte, 6)
 	maxWorkers := 3
 	timeOutConn := 0
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	//Запуск тест вервера
 	server := NewTestServer()
 	defer server.Close()
-	ctx, cancel := context.WithCancel(context.Background())
 
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("test №%d - %s", i, tt.name), func(t *testing.T) {
 
 			resonalIds = tt.in.resonalId
+			displayName = tt.in.displayName
+			authorization = tt.in.authorization
 
-			client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar)
-			require.NotNilf(t, client, "worker pull is nil!")
+			workerPull := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar)
+			require.NotNilf(t, workerPull, "worker pull is nil!")
 
-			client.urlExtData = server.URL + "/Portal/springApi/api/employees"
-			client.urlStatusAbv = server.URL + "/Portal/springApi/api/absences"
+			workerPull.urlExtData = server.URL + "/Portal/springApi/api/employees"
+			workerPull.urlStatusAbv = server.URL + "/Portal/springApi/api/absences"
 
 			resultChan := make(chan []byte)
 			channel <- resultChan
@@ -122,11 +170,12 @@ func TestWorkerPull(t *testing.T) {
 			close(resultChan)
 			cancel()
 
-			log.Println(v.String())
 			require.Equal(t, tt.want.status, v.Get("status").String())
-			require.Equal(t, tt.want.id, v.GetInt("id"))
-			require.Equal(t, tt.want.email, v.Get("email").String())
-			require.Equal(t, tt.want.displayName, v.Get("displayName").String())
+			if v.Exists("id", "email", "displayName") {
+				require.Equal(t, tt.want.id, v.GetInt("id"))
+				require.Equal(t, tt.want.email, v.Get("email").String())
+				require.Equal(t, tt.want.displayName, v.Get("displayName").String())
+			}
 		})
 	}
 
@@ -194,15 +243,19 @@ func NewTestServer() *httptest.Server {
 			return
 		}
 
+		if v.Exists("email") {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		w.WriteHeader(http.StatusOK)
 		answ := fmt.Sprintf(`{"status":"OK",
 					"data":[
 								{"id":1234,
-								"displayName":"Иванов Семен Петрович",
-								"email":"petrovich@mail.ru",
+								"displayName":"%s",
 								"email":%s,
 								"workPhone":"1234"}
-							]}`, v.Get("email"))
+							]}`, displayName, v.Get("email"))
 		w.Write([]byte(answ))
 	})
 
