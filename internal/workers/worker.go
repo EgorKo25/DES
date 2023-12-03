@@ -3,6 +3,7 @@ package workers
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +32,14 @@ var (
 	httpError                        = "not allowed response code from http"
 )
 
+type Auth struct {
+	login    string
+	password string
+}
+
 type WorkerPull struct {
+	*Auth
+
 	channel chan chan []byte
 	logger  Logger
 	client  *http.Client
@@ -43,10 +51,15 @@ type WorkerPull struct {
 	maxResponseTime int
 }
 
-func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger Logger) *WorkerPull {
+func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger Logger, login, password string) *WorkerPull {
 	w := WorkerPull{
-		logger:          logger,
-		channel:         channel,
+		Auth: &Auth{
+			login:    login,
+			password: password,
+		},
+		logger:  logger,
+		channel: channel,
+
 		maxResponseTime: maxResponseTime,
 		workerPullSize:  maxWorkers,
 		client: &http.Client{
@@ -58,6 +71,7 @@ func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, ti
 	}
 
 	if ctx.Err() != nil {
+		logger.Errorf("context err is not nil - %s", ctx.Err())
 		return nil
 	}
 
@@ -117,7 +131,7 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 
 			if body, err = wp.processRequest(childCtx, wp.urlStatusAbv, data, body); err != nil {
 				wp.logger.Errorf("%v", err)
-				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
 				continue
 			}
 			//TODO:Обработка ответов стороннего сервера
@@ -166,8 +180,7 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 		return nil, err
 	}
 
-	//TODO
-	req.Header.Set("Authorization", "")
+	req.Header.Set("Authorization", wp.getAuthorization())
 
 	resp, err := wp.client.Do(req)
 	if err != nil {
@@ -176,14 +189,14 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		wp.logger.Errorf(httpError)
+		wp.logger.Errorf("%s - %d", httpError, resp.StatusCode)
 		switch resp.StatusCode {
 		case http.StatusUnauthorized:
 			return nil, errors.New("UNAUTHORIZED")
 		case http.StatusBadRequest:
 			return nil, errors.New("BAD REQUEST")
 		}
-		return nil, errors.New(httpError)
+		return nil, errors.New("INTERNAL SERVER ERROR")
 	}
 
 	body, err = io.ReadAll(resp.Body)
@@ -198,4 +211,8 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 	}
 
 	return body, nil
+}
+
+func (wp *WorkerPull) getAuthorization() string {
+	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", wp.login, wp.password)))
 }
