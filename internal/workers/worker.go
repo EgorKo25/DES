@@ -95,18 +95,20 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 
 			if !ok {
 				wp.logger.Infof("client got a nil channel")
+				close(childCh)
 				break
 			}
 			d, ok := <-childCh
 			if !ok {
 				wp.logger.Errorf("response channel is close!")
-				childCh <- []byte(`{"status":"CLOSE CHAN"}`)
+				close(childCh)
 				continue
 			}
 
 			userExtendedData, err := fastjson.ParseBytes(d)
 			if err != nil {
 				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				close(childCh)
 				continue
 			}
 
@@ -118,10 +120,16 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			if body, err = wp.processRequest(childCtx, wp.urlExtData, userExtendedData, body); err != nil {
 				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
 				cancel()
+				close(childCh)
 				continue
 			}
 
-			userExtendedData = fastjson.MustParseBytes(body)
+			userExtendedData, err = fastjson.ParseBytes(body)
+			if err != nil {
+				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
+				close(childCh)
+				continue
+			}
 
 			data := userExtendedData.GetArray("data")[0]
 			data.Set("personalIds", a.NewArray())
@@ -132,13 +140,13 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			if body, err = wp.processRequest(childCtx, wp.urlStatusAbv, data, body); err != nil {
 				wp.logger.Errorf("%v", err)
 				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
+				close(childCh)
 				continue
 			}
-			//TODO:Обработка ответов стороннего сервера
-			//TODO:НЕизвестный ответ сервера
 			userExtendedData, err = fastjson.ParseBytes(body)
 			if err != nil {
 				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				close(childCh)
 				continue
 			}
 
@@ -146,9 +154,13 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 
 			data.Set("displayName", a.NewString(string(data.GetStringBytes("displayName"))+
 				wp.setSmile(userExtendedData.GetArray("data")[0].GetInt("reasonId"))))
-			data.Set("status", a.NewString("OK"))
 
-			childCh <- data.MarshalTo(d[:0])
+			result := a.NewObject()
+			result.Set("status", a.NewString("OK"))
+			result.Set("users", data)
+
+			childCh <- result.MarshalTo(d[:0])
+			close(childCh)
 
 			a.Reset()
 		default:
