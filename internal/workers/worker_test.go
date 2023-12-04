@@ -21,9 +21,10 @@ var sugar = logger.Sugar()
 
 // Эхо Переменные тест сервера
 var (
-	authorization string
-	displayName   string
-	resonalIds    int
+	displayName = ""
+	resonalIds  = 0
+
+	authorization = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", "admin", "admin")))
 )
 
 func TestWorkerPull(t *testing.T) {
@@ -89,6 +90,10 @@ func TestWorkerPull(t *testing.T) {
 			},
 			in: in{
 				resonalId: 9,
+				authorization: Auth{
+					login:    "admin",
+					password: "admin",
+				},
 
 				email:    "petrovich@mail.ru",
 				dateFrom: "10.20.30",
@@ -103,11 +108,11 @@ func TestWorkerPull(t *testing.T) {
 				status: `"UNAUTHORIZED"`,
 			},
 			in: in{
-				resonalId: 0,
 				authorization: Auth{
-					login:    "admin",
-					password: "admin",
+					login:    "123",
+					password: "123",
 				},
+				resonalId: 0,
 
 				email:    "petrovich@mail.ru",
 				dateFrom: "10.20.30",
@@ -154,26 +159,25 @@ func TestWorkerPull(t *testing.T) {
 	server := NewTestServer()
 	defer server.Close()
 
+	workerPull := NewWorkerPull(ctx, channel,
+		maxWorkers, timeOutConn,
+		3, sugar,
+		"", "",
+	)
+
+	workerPull.urlExtData = server.URL + "/Portal/springApi/api/employees"
+	workerPull.urlStatusAbv = server.URL + "/Portal/springApi/api/absences"
+
 	for i, tt := range tests {
 		t.Run(fmt.Sprintf("test №%d - %s", i, tt.name), func(t *testing.T) {
 
 			resonalIds = tt.in.resonalId
 			displayName = tt.in.displayName
-			authorization = base64.StdEncoding.EncodeToString([]byte(
-				fmt.Sprintf("%s:%s", tt.in.authorization.login, tt.in.authorization.password)),
-			)
 
-			workerPull := NewWorkerPull(ctx, channel,
-				maxWorkers, timeOutConn,
-				3, sugar,
-				tt.in.authorization.login,
-				tt.in.authorization.password,
-			)
+			workerPull.login = tt.in.authorization.login
+			workerPull.password = tt.in.authorization.password
 
 			require.NotNilf(t, workerPull, "worker pull is nil!")
-
-			workerPull.urlExtData = server.URL + "/Portal/springApi/api/employees"
-			workerPull.urlStatusAbv = server.URL + "/Portal/springApi/api/absences"
 
 			resultChan := make(chan []byte)
 			channel <- resultChan
@@ -181,13 +185,13 @@ func TestWorkerPull(t *testing.T) {
 			resultChan <- []byte(fmt.Sprintf(`{"email":"%s", "dateTo":"%s", "dateFrom":"%s"}`, tt.in.email, tt.in.dateTo, tt.in.dateFrom))
 
 			v := fastjson.MustParseBytes(<-resultChan)
-			close(resultChan)
 
 			require.Equal(t, tt.want.status, v.Get("status").String())
-			if v.Exists("id", "email", "displayName") {
-				require.Equal(t, tt.want.id, v.GetInt("id"))
-				require.Equal(t, tt.want.email, v.Get("email").String())
-				require.Equal(t, tt.want.displayName, v.Get("displayName").String())
+			if v.Exists("id", "email", "name") {
+				users := v.Get("users")
+				require.Equal(t, tt.want.id, users.GetInt("id"))
+				require.Equal(t, tt.want.email, users.Get("email").String())
+				require.Equal(t, tt.want.displayName, users.Get("displayName").String())
 			}
 		})
 	}
@@ -236,6 +240,10 @@ func NewTestServer() *httptest.Server {
 	mux.HandleFunc("/Portal/springApi/api/employees", func(w http.ResponseWriter, r *http.Request) {
 
 		auth := r.Header.Get("Authorization")
+		auth2, _ := base64.StdEncoding.DecodeString(auth)
+		authentification, _ := base64.StdEncoding.DecodeString(authorization)
+
+		sugar.Info(string(auth2), " = ===== = ", string(authentification))
 		if auth != authorization {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -254,7 +262,7 @@ func NewTestServer() *httptest.Server {
 			return
 		}
 
-		if str := v.Get("email"); str.String() != "" {
+		if str := v.Get("email"); str.String() == `""` {
 			sugar.Errorf("have not key email in resp body - %s", v.String())
 			w.WriteHeader(http.StatusBadRequest)
 			return
