@@ -10,19 +10,12 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/enescakir/emoji"
 
 	"github.com/valyala/fastjson"
 )
-
-//TODO: README FIX
-
-type Logger interface {
-	Infof(msg string, fields ...any)
-	Errorf(msg string, fields ...any)
-	Warnf(msg string, fields ...any)
-	Debugf(msg string, fields ...any)
-}
 
 var (
 	keepAliveConnectionTerminatError = "error keep alive"
@@ -41,7 +34,7 @@ type WorkerPull struct {
 	*Auth
 
 	channel chan chan []byte
-	logger  Logger
+	logger  *zap.SugaredLogger
 	client  *http.Client
 
 	urlExtData   string
@@ -51,7 +44,7 @@ type WorkerPull struct {
 	maxResponseTime int
 }
 
-func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger Logger, login, password string) *WorkerPull {
+func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger *zap.SugaredLogger, login, password string) *WorkerPull {
 	w := WorkerPull{
 		Auth: &Auth{
 			login:    login,
