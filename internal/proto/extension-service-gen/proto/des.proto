@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package service;
+
+option go_package = "github.com/EgorKo25/DES/internal/proto";
+
+service UserExtensionService  {
+  rpc GetUserExtension(GetRequest) returns (GetResponse);
+}
+
+message GetRequest {
+  UserData user_data = 1;
+}
+
+message GetResponse {
+  string status = 1;
+  UserData users = 2;
+}
+
+message UserData {
+  int32 ids = 1;
+  string name = 2;
+  string email = 3;
+  string phone_number = 4;
+  string date_to = 5;
+  string date_from = 6;
+}
+
+
+
