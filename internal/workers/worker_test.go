@@ -16,8 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var logger, _ = zap.NewProduction()
-var sugar = logger.Sugar()
+var sugar, _ = zap.NewProduction()
 
 // Эхо Переменные тест сервера
 var (
@@ -36,7 +35,8 @@ func TestWorkerPull(t *testing.T) {
 		maxWorkers := 5
 		timeOutConn := 10
 
-		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar, "", "")
+		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, "", "",
+			sugar, sugar)
 
 		if client == nil {
 			t.Fatal("Expected a non-nil client, got nil")
@@ -52,7 +52,10 @@ func TestWorkerPull(t *testing.T) {
 		maxWorkers := 5
 		timeOutConn := 10
 
-		client := NewWorkerPull(ctx, channel, maxWorkers, timeOutConn, 3, sugar, "", "")
+		client := NewWorkerPull(ctx, channel,
+			maxWorkers, timeOutConn, 3,
+			"", "",
+			sugar, sugar)
 		require.Nil(t, client)
 	})
 
@@ -139,7 +142,7 @@ func TestWorkerPull(t *testing.T) {
 		{
 			name: "Wrong http response test case",
 			want: want{
-				status: `"INTERNAL SERVER ERROR"`,
+				status: `"BAD REQUEST"`,
 			},
 			in: in{
 				resonalId: 0,
@@ -160,9 +163,9 @@ func TestWorkerPull(t *testing.T) {
 	defer server.Close()
 
 	workerPull := NewWorkerPull(ctx, channel,
-		maxWorkers, timeOutConn,
-		3, sugar,
+		maxWorkers, timeOutConn, 3,
 		"", "",
+		sugar, sugar,
 	)
 
 	workerPull.urlExtData = server.URL + "/Portal/springApi/api/employees"
@@ -240,10 +243,7 @@ func NewTestServer() *httptest.Server {
 	mux.HandleFunc("/Portal/springApi/api/employees", func(w http.ResponseWriter, r *http.Request) {
 
 		auth := r.Header.Get("Authorization")
-		auth2, _ := base64.StdEncoding.DecodeString(auth)
-		authentification, _ := base64.StdEncoding.DecodeString(authorization)
 
-		sugar.Info(string(auth2), " = ===== = ", string(authentification))
 		if auth != authorization {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -257,13 +257,17 @@ func NewTestServer() *httptest.Server {
 
 		v, err := fastjson.ParseBytes(body)
 		if err != nil {
-			sugar.Errorf("cannot read resp body - %s", v.String())
+			sugar.Error("cannot read resp body",
+				zap.String("body", v.String()),
+			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if str := v.Get("email"); str.String() == `""` {
-			sugar.Errorf("have not key email in resp body - %s", v.String())
+			sugar.Error("have not key email in resp body",
+				zap.String("body", v.String()),
+			)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}

@@ -17,41 +17,17 @@ import (
 	"github.com/valyala/fastjson"
 )
 
-var (
-	keepAliveConnectionTerminatError = "error keep alive"
-	cannotReadBodyError              = "cannot read response body"
-	clientError                      = "client cannot send request"
-	requestCreateError               = "cannot create new request"
-	httpError                        = "not allowed response code from http"
-)
-
-type Auth struct {
-	login    string
-	password string
-}
-
-type WorkerPull struct {
-	*Auth
-
-	channel chan chan []byte
-	logger  *zap.SugaredLogger
-	client  *http.Client
-
-	urlExtData   string
-	urlStatusAbv string
-
-	workerPullSize  int
-	maxResponseTime int
-}
-
-func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger *zap.SugaredLogger, login, password string) *WorkerPull {
+func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int,
+	login, password string,
+	logger, htpLogger *zap.Logger) *WorkerPull {
 	w := WorkerPull{
 		Auth: &Auth{
 			login:    login,
 			password: password,
 		},
-		logger:  logger,
-		channel: channel,
+		logger:     logger,
+		httpLogger: htpLogger,
+		channel:    channel,
 
 		maxResponseTime: maxResponseTime,
 		workerPullSize:  maxWorkers,
@@ -64,16 +40,39 @@ func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, ti
 	}
 
 	if ctx.Err() != nil {
-		logger.Errorf("context err is not nil - %s", ctx.Err())
+		logger.Error("context error is not nil",
+			zap.String("error", ctx.Err().Error()),
+		)
 		return nil
 	}
 
 	for i := 0; i < w.workerPullSize; i++ {
-		w.logger.Infof("worker %d is running", i+1)
+		w.logger.Info("starting worker",
+			zap.Int("worker number", i+1),
+		)
 		go w.worker(ctx)
 	}
-
 	return &w
+}
+
+type WorkerPull struct {
+	*Auth
+
+	channel    chan chan []byte
+	logger     *zap.Logger
+	httpLogger *zap.Logger
+	client     *http.Client
+
+	urlExtData   string
+	urlStatusAbv string
+
+	workerPullSize  int
+	maxResponseTime int
+}
+
+type Auth struct {
+	login    string
+	password string
 }
 
 func (wp *WorkerPull) worker(ctx context.Context) {
@@ -85,22 +84,20 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 		case <-ctx.Done():
 			break
 		case childCh, ok := <-wp.channel:
-
 			if !ok {
-				wp.logger.Infof("client got a nil channel")
+				wp.logger.Error("client got a nil channel")
 				close(childCh)
 				break
 			}
 			d, ok := <-childCh
 			if !ok {
-				wp.logger.Errorf("response channel is close!")
-				close(childCh)
+				wp.logger.Error("response channel is close!")
 				continue
 			}
 
 			userExtendedData, err := fastjson.ParseBytes(d)
 			if err != nil {
-				childCh <- []byte(`{"status":"INTERNAL SERVER ERROR"}`)
+				childCh <- []byte(`{"status":"BAD REQUEST"}`)
 				close(childCh)
 				continue
 			}
@@ -111,9 +108,12 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			childCtx, cancel := context.WithTimeout(ctx, time.Duration(wp.maxResponseTime)*time.Second)
 
 			if body, err = wp.processRequest(childCtx, wp.urlExtData, userExtendedData, body); err != nil {
+				wp.logger.Error("process request error",
+					zap.String("error", err.Error()),
+				)
 				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
-				cancel()
 				close(childCh)
+				cancel()
 				continue
 			}
 
@@ -131,7 +131,9 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			data.Set("dateTo", dateTo)
 
 			if body, err = wp.processRequest(childCtx, wp.urlStatusAbv, data, body); err != nil {
-				wp.logger.Errorf("%v", err)
+				wp.logger.Error("process request error",
+					zap.String("error", err.Error()),
+				)
 				childCh <- []byte(fmt.Sprintf(`{"status":"%s"}`, err))
 				close(childCh)
 				continue
@@ -156,6 +158,7 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 			close(childCh)
 
 			a.Reset()
+			cancel()
 		default:
 		}
 	}
@@ -181,20 +184,21 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		url, bytes.NewReader(data.MarshalTo(body[:0])))
 	if err != nil {
-		wp.logger.Errorf(requestCreateError)
 		return nil, err
 	}
 
 	req.Header.Set("Authorization", wp.getAuthorization())
 
+	timeStart := time.Now()
+
 	resp, err := wp.client.Do(req)
 	if err != nil {
-		wp.logger.Errorf(clientError)
 		return nil, err
 	}
 
+	duration := time.Since(timeStart)
+
 	if resp.StatusCode != http.StatusOK {
-		wp.logger.Errorf("%s - %d", httpError, resp.StatusCode)
 		switch resp.StatusCode {
 		case http.StatusUnauthorized:
 			return nil, errors.New("UNAUTHORIZED")
@@ -206,14 +210,19 @@ func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fast
 
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
-		wp.logger.Errorf(cannotReadBodyError)
 		return nil, err
 	}
 
 	if _, err = io.Copy(io.Discard, resp.Body); err != nil {
-		wp.logger.Errorf(keepAliveConnectionTerminatError)
 		return nil, err
 	}
+
+	wp.httpLogger.Info("http request done",
+		zap.String("request", data.String()),
+		zap.String("response code", resp.Status),
+		zap.String("response", string(body)),
+		zap.Duration("duration", duration),
+	)
 
 	return body, nil
 }
