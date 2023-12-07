@@ -7,6 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 
 	pb "github.com/EgorKo25/DES/internal/server/extension-service-gen"
@@ -15,10 +20,14 @@ import (
 )
 
 func TestExtServer_GetUserExtension(t *testing.T) {
-	channel := make(chan chan []byte, 6)
-	es := NewExtServer(channel)
+
+	logger := zap.NewExample()
+	channel := make(chan chan []byte, 10)
+	es := NewExtServer(channel, logger, logger)
 	s, _ := es.StartServer(":8080")
+
 	{
+
 		t.Run("Test Canceled Context", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 
@@ -34,7 +43,6 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 			_, err = c.GetUserExtension(ctx, nil)
 
 			require.Equal(t, "rpc error: code = Canceled desc = context canceled", err.Error())
-
 		})
 	}
 	{
@@ -116,8 +124,37 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 				log.Println(resp)
 				require.NotNil(t, resp.Users)
 				require.Equal(t, tt.want.ud.Name, resp.Users.Name)
+
 			})
 		}
-		s.Stop()
 	}
+	{
+
+		channel := make(chan chan []byte, 1)
+		es := NewExtServer(channel, logger, logger)
+		es.StartServer(":8080")
+
+		t.Run("Test Too Many Request", func(t *testing.T) {
+			ctx := context.Background()
+
+			childCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+			defer cancel()
+
+			creds := insecure.NewCredentials()
+			conn, err := grpc.DialContext(ctx, ":8080", grpc.WithTransportCredentials(creds))
+			if err != nil {
+				require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
+			}
+			defer conn.Close()
+
+			c := pb.NewUserExtensionServiceClient(conn)
+
+			go c.GetUserExtension(childCtx, &pb.GetRequest{UserData: &pb.UserData{Email: ""}})
+
+			_, err = c.GetUserExtension(childCtx, &pb.GetRequest{UserData: &pb.UserData{Email: ""}})
+
+			require.Equalf(t, status.Error(codes.ResourceExhausted, "TOO MANY REQUEST"), err, err.Error())
+		})
+	}
+	s.Stop()
 }

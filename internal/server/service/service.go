@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"net"
 	"strings"
 	"time"
+
+	"go.uber.org/zap"
 
 	pb "github.com/EgorKo25/DES/internal/server/extension-service-gen"
 
@@ -21,13 +22,17 @@ var ch chan chan []byte
 
 type ExtServer struct {
 	pb.UnimplementedUserExtensionServiceServer
-	chanLength    int
-	chanMaxLength int
+
+	logger     *zap.Logger
+	grpcLogger *zap.Logger
 }
 
-func NewExtServer(channel chan chan []byte) *ExtServer {
+func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger) *ExtServer {
 	ch = channel
-	return &ExtServer{chanMaxLength: cap(ch)}
+	return &ExtServer{
+		logger:     logger,
+		grpcLogger: grpcLogger,
+	}
 }
 
 func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (out *pb.GetResponse, err error) {
@@ -38,9 +43,13 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 		return nil, status.Error(codes.InvalidArgument, "BAD REQUEST")
 	}
 
-	ch <- resultChan
-	resultChan <- data
-
+	select {
+	case ch <- resultChan:
+		resultChan <- data
+	default:
+		log.Println(len(ch), cap(ch))
+		return nil, status.Error(codes.ResourceExhausted, "TOO MANY REQUEST")
+	}
 	select {
 	case <-ctx.Done():
 		return nil, status.Error(codes.Canceled, strings.ToUpper(ctx.Err().Error()))
@@ -53,32 +62,43 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 	}
 }
 
-func (es *ExtServer) LogUnaryRpcInterceptor(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo,
-	handler grpc.UnaryHandler) (resp interface{}, err error) {
+func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{},
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+	timeStart := time.Now()
 
-	before := time.Now()
+	es.grpcLogger.Info(
+		"grpc connection start",
+		zap.String("grpc request", req.(*pb.GetRequest).String()),
+	)
 
 	m, err := handler(ctx, req)
-	_ = time.Since(before)
 
+	isRespNil := resp != nil
+
+	es.grpcLogger.Info(
+		"grpc connection done",
+		zap.Bool("is grpc response", isRespNil),
+		zap.NamedError("response error", err),
+		zap.Duration("duration", time.Since(timeStart)),
+	)
 	return m, err
-
 }
 
 func (es *ExtServer) StartServer(port string) (*grpc.Server, error) {
 	lis, err := net.Listen("tcp", port)
-
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("failed to listen: %v", err))
+		return nil, fmt.Errorf("failed to listen: %v", err)
 	}
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(es.LogUnaryRpcInterceptor),
+		grpc.UnaryInterceptor(es.LogUnaryRPCInterceptor),
 	)
 	pb.RegisterUserExtensionServiceServer(s, &ExtServer{})
 
 	go func() {
 		if err := s.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
+			es.logger.Fatal("failed to serve",
+				zap.String("error", err.Error()),
+			)
 		}
 	}()
 
