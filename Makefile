@@ -2,7 +2,7 @@
 
 PROTO_FILE = server/extension-service-gen/proto/des.proto
 GENERATED_DIR = internal/service
-BIN_NAME = des
+BIN_NAME = DES
 
 generate-grpc:
 	mkdir -p $(GENERATED_DIR)
