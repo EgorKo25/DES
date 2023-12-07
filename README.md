@@ -3,11 +3,15 @@
 **Сервис** занимаеться обогощением данных, получаемых по средствам <br> gRPC запросов.
 
 ## Как его собрать/запустить?  
+
+### Интерактивный запуск
+
 ```bash
     # чтобы запустить файл
     go run cmd/des/des.go
 ```
-<br>
+
+### Запуск из исходника
 
 ```bash 
     # чтобы собрать исполняемый файл
@@ -16,69 +20,89 @@
     ./des
 ```
 
+Также к проекту приложен `Makefile`
+
+
 ## ![Typing SVG](https://readme-typing-svg.herokuapp.com?color=%2336BCF7&lines=Что+реализовано+в+проекте?)
 
-# Пакет Workers
+## [Пакет Конфигурации](https://github.com/EgorKo25/DES/blob/config/internal/config/config.go)
 
-Пакет `workers` предоставляет простую реализацию пула горутин для параллельной обработки задач. Он разработан для выполнения задач с использованием горутин.
-
-## Client
-
-Структура `Client` представляет клиента для управления рабочими задачами. Он поддерживает создание рабочих горутин и обработку задач параллельно.
-
-### Конструктор
+### Описание
 
 ```go
-func NewClient(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int, logger Logger) *Client
-```
-Создает новый экземпляр Client с заданной конфигурацией.
+package config
 
-* ctx: Контекст для управления жизненным циклом клиента.
-* channel: Канал для получения задач.
-* maxWorkers: Максимальное количество рабочих горутин.
-* timeOutConn: Таймаут соединения для HTTP-запросов.
-* maxResponseTime: Максимальное время ответа для HTTP-запросов.
-* logger: Интерфейс логгера для ведения журнала.
-
-### Worker
-  Метод worker являеться типовым обработчиком, слушающим канал ```chan chan []byte```.
-
-```go
-func (w *Client) worker(ctx context.Context)
-````
-Он обрабатывает задачи из входного канала, выполняет HTTP-запросы и расширяет данные задачи соответственно.
-### Обработка запроса
-Метод processRequest используется для обработки HTTP-запросов.
-
-```go
-func (w *Client) processRequest(ctx context.Context, url string, data *fastjson.Value, body []byte) ([]byte, error)
-```
-Он создает HTTP-запрос, отправляет его и возвращает тело ответа.
-### Установка смайла
-Метод **setSmile** добавляет эмодзи в поле **displayName** на основе reasonId.
-
-```go
-func (w *Client) setSmile(reasonId int) string
-```
-Возвращает строковое представление эмодзи на основе указанного _**reasonId**_.
-### Логгер
-Интерфейс Logger определяет методы для ведения журнала сообщений различных уровней.
-```go
-type Logger interface {
-    Infof(msg string, fields ...any)
-    Errorf(msg string, fields ...any)
-    Warnf(msg string, fields ...any)
-    Debugf(msg string, fields ...any)
+type AppConfig struct {
+	WorkerConfig  WorkerConfig  `json:"worker"`
+	ServiceConfig ServiceConfig `json:"service"`
 }
+
+type ServiceConfig struct {
+	IP   string `json:"IP"`
+	PORT string `json:"PORT"`
+}
+
+type WorkerConfig struct {
+	MaxWorkers         int `json:"max_workers"`
+	MaxTimeForResponse int `json:"max_time_for_response"`
+	TimeoutConnection  int `json:"timeout_connection"`
+
+	RemoteHTTPServer struct {
+		IP   string `json:"IP"`
+		PORT string `json:"PORT"`
+	} `json:"remote_http_server"`
+	Authentication struct {
+		Login    string `json:"login"`
+		Password string `json:"password"`
+	} `json:"authentication"`
+}
+
 ```
-Он включает методы для ведения журнала информационных, ошибочных, предупредительных и отладочных сообщений.
 
-### Ошибки
-Пакет определяет константы для общих сообщений об ошибках:
+`AppConfig`: Основная структура, содержащая все параметры конфигурации.
 
-+ **keepAliveConnectionTerminatError**: Сообщение об ошибке отсоединения keep-alive соединения.
-+ **cannotReadBodyError**: Сообщение об ошибке чтения тела ответа.
-+ **clientError**: Сообщение об ошибке, связанной с клиентом.
-+ **requestCreateError**: Сообщение об ошибке создания HTTP-запроса.
-+ **httpError**: Сообщение о получении HTTP ответа с ошибой.
+`ServiceConfig`: Подструктура, описывающая параметры конфигурации сервиса.
 
+`WorkerConfig`: Подструктура, описывающая параметры конфигурации рабочего процесса, включая параметры для удаленного HTTP-сервера и аутентификации.
+
+### Флаг командной строки
+`-path-to-config`: Флаг для указания пути к файлу конфигурации. Если флаг не указан, будет использован путь по умолчанию *(config/app.conf)*.
+
+### Важное замечание
+
++ **Конфигурация загружается из файла JSON**. Убедитесь, что файл конфигурации существует и имеет правильный формат.
+
+### Пример конфигурации
+
+```json
+
+{
+    "service": {
+        "IP": "127.0.0.1",
+        "PORT": ":8080"
+    },
+    "worker": {
+        "_comments": {
+            "description": "this is a configuration for worker pull"
+        },
+        "max_workers": 6,
+        "timeout_connection": 0,
+        "max_time_for_response": 2,
+        "remote_http_server": {
+            "_comments": {
+                "description": "this is a remote http server config"
+            },
+            "IP": "127.0.0.1",
+            "PORT": "4557"
+        },
+        "authentication": {
+            "_comments": {
+                "description": "this is a data for authentication"
+            },
+            "login": "admin",
+            "password": "admin"
+        }
+    }
+}
+
+```
