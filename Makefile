@@ -1,6 +1,6 @@
 .PHONY: generate-grpc server-start build clean
 
-PROTO_FILE = proto/service/des.proto
+PROTO_FILE = server/extension-service-gen/proto/des.proto
 GENERATED_DIR = internal/service
 BIN_NAME = des
 
