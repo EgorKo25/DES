@@ -302,3 +302,81 @@ message UserData {
   string date_from = 6;
 }
 ```
+
+## [Worker package](https://github.com/EgorKo25/DES/blob/main/internal/workers/worker.go)
+1. Функция-конструктор **`NewWorkerPull`:**
+    ```go
+    NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int,
+	login, password string, logger, htpLogger *zap.Logger) *WorkerPull
+   ```
+    - Инициализирует и возвращает новый экземпляр `WorkerPull`.
+    - Запускает указанное количество воркеров в горутинах.
+    - Устанавливает контекст, таймаут подключения, логин, пароль и другие параметры.
+    - Проверяет, что контекст не содержит ошибку.
+
+2. Структура **`WorkerPull`:**
+```go
+   type WorkerPull struct {
+	*Auth
+
+	channel    chan chan []byte
+	logger     *zap.Logger
+	httpLogger *zap.Logger
+	client     *http.Client
+
+	urlExtData   string
+	urlStatusAbv string
+
+	workerPullSize  int
+	maxResponseTime int
+}
+``` 
+   - Содержит информацию о воркере: 
+     - аутентификацию **`(*Auth)`**
+     - логгеры **`logger, httpLogger`**
+     - клиент HTTP **`client`**
+     - адреса обработчиков удаленного HTTP **`urlExtData, urlStatusAbv`**
+     - Максимальное количесвто воркеров **`workerPullSize`**
+     - Максимально время для ответа в канал **`maxResponseTime`**
+   - Метод `worker` - выполняет обработку запросов из канала. Обрабатывает полученные данные, отправляет запросы и возвращает результаты.
+
+3. **`Auth` структура:**
+```go
+type Auth struct {
+	login    string
+	password string
+}
+```
+
+- Хранит логин и пароль для аутентификации.
+
+4. **Методы `worker` и `processRequest`:**
++ `worker`: Обрабатывает данные из канала, отправляет запросы и возвращает результаты.
+```go
+func (wp *WorkerPull) worker(ctx context.Context)
+```
++ `processRequest`: Отправляет HTTP-запрос с предоставленными данными и возвращает тело ответа.
+```go
+func (wp *WorkerPull) processRequest(ctx context.Context, url string, data *fastjson.Value, body []byte) ([]byte, error)
+```
+5. **`setSmile` функция:**
+```go
+func (wp *WorkerPull) setSmile(reasonId int) string 
+```
++ Возвращает эмоджи в зависимости от переданного `reasonId`.
+
+6. **`getAuthorization` функция:**
+```go
+func (wp *WorkerPull) getAuthorization() string
+```
+
++ Возвращает строку для заголовка авторизации, созданную на основе логина и пароля.
+
+7. **Логирование:**
+    - Используется пакет `go.uber.org/zap` для логирования.
+    - Различные логи, такие как информация о начале работы воркера, отправке запросов и получении ответов, сохранены для отслеживания действий приложения.
+
+8. **Использование emoji:**
+    - Используется пакет `github.com/enescakir/emoji` для добавления эмоджи в строку в зависимости от `reasonId`.
+
+Этот код представляет собой воркер-пул для обработки запросов. Каждый воркер получает данные из канала, отправляет запросы на указанные URL-ы, обрабатывает ответы и возвращает результаты.
