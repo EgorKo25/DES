@@ -33,30 +33,30 @@
 package config
 
 type AppConfig struct {
-	WorkerConfig  WorkerConfig  `json:"worker"`
-	ServiceConfig ServiceConfig `json:"service"`
+  WorkerConfig       WorkerConfig  `json:"worker"`
+  ServiceConfig      ServiceConfig `json:"service"`
+  ChannelSize        int           `json:"queue_task_size"`
+  CacheClearInterval int           `json:"cache_clear_interval"`
 }
 
 type ServiceConfig struct {
-	IP   string `json:"IP"`
-	PORT string `json:"PORT"`
+  IP   string `json:"IP"`
+  PORT string `json:"PORT"`
 }
 
 type WorkerConfig struct {
-	MaxWorkers         int `json:"max_workers"`
-	MaxTimeForResponse int `json:"max_time_for_response"`
-	TimeoutConnection  int `json:"timeout_connection"`
-
-	RemoteHTTPServer struct {
-		IP   string `json:"IP"`
-		PORT string `json:"PORT"`
-	} `json:"remote_http_server"`
-	Authentication struct {
-		Login    string `json:"login"`
-		Password string `json:"password"`
-	} `json:"authentication"`
+  RemoteHTTPServer struct {
+    IP   string `json:"IP"`
+    PORT string `json:"PORT"`
+  } `json:"remote_http_server"`
+  Authentication struct {
+    Login    string `json:"login"`
+    Password string `json:"password"`
+  } `json:"authentication"`
+  MaxWorkers         int `json:"max_workers"`
+  MaxTimeForResponse int `json:"max_time_for_response"`
+  TimeoutConnection  int `json:"timeout_connection"`
 }
-
 ```
 
 `AppConfig`: Основная структура, содержащая все параметры конфигурации.
@@ -77,6 +77,8 @@ type WorkerConfig struct {
 ```json
 
 {
+    "channel_size":20,
+    "cache_clear_interval":20,
     "service": {
         "IP": "127.0.0.1",
         "PORT": ":8080"
@@ -126,3 +128,131 @@ type WorkerConfig struct {
 
 
 Этот пакет предоставляет стандартный способ создания и настройки логгеров в вашем приложении, обеспечивая удобство использования и гибкость в конфигурации.
+## [Cache package](https://github.com/EgorKo25/DES/blob/config/internal/cache/cache.go)
+
+Этот пакет предоставляет простой механизм кэширования данных с автоматической очисткой по истечении указанного времени.
+
+### Функционал
+1. **Создание кэша:**
+   Используйте функцию `NewCache` для создания нового экземпляра кэша:
+
+   ```go
+   c := cache.NewCache(ctx, duration)
+   ```
+
+3. **Загрузка данных в кэш:**
+   Используйте метод `Load` для добавления данных в кэш:
+
+   ```go
+   Load(title, data)
+   ```
+
+4. **Поиск данных в кэше:**
+   Используйте метод `Search` для поиска данных в кэше:
+
+   ```go
+   data, ok := c.Search(title); ok 
+   ```
+
+5. **Автоматическая очистка:**
+   Кэш автоматически очищается от данных по истечении указанного времени с момента последней загрузки(`duration`). Время указывается при создании кэша.
+
+## [Service package](https://github.com/EgorKo25/DES/blob/config/internal/server/service/service.go)
+
+Давайте разберем каждую функцию и структуру в вашем коде:
+
+1. структура **`ExtServer`:**
+```go
+type ExtServer struct {
+	pb.UnimplementedUserExtensionServiceServer
+
+	logger     *zap.Logger
+	grpcLogger *zap.Logger
+
+	cache Cacher
+}
+```
+  - `logger`: Экземпляр логгера из библиотеки `go.uber.org/zap` для логирования общих событий сервиса.
+
+  - `grpcLogger`: Еще один экземпляр логгера для логирования событий gRPC, таких как начало и завершение соединения, а также информации о запросах.
+
+  - `cache`: Интерфейс `Cacher`, который представляет кэш для хранения данных. Этот интерфейс предоставляет два метода: `Load` для добавления данных в кэш и `Search` для поиска данных по ключу.
+
+2. функция **`NewExtServer`:**
+
+```go
+func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cache Cacher) *ExtServer
+```
+
+  - Создает новый экземпляр `ExtServer`.
+
+  - Принимает канал `channel` для взаимодействия с воркерами и логгеры для логирования.
+
+  - Возвращает указатель на новый экземпляр `ExtServer`.
+
+3. метод-обработчик **`GetUserExtension`:**
+```go
+func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (out *pb.GetResponse, err error)
+```
+  - Метод, удовлетворяющий интерфейсу `UserExtensionServiceServer` сгенерированного gRPC кода.
+
+  - Получает запрос от клиента и отправляет его в канал `ch` для воркеров. Если канал занят, возвращает ошибку `ResourceExhausted`.
+
+  - Ожидает ответ от воркеров в виде JSON-подобной строки, затем десериализует и возвращает результат. Загружает результат в кэш.
+
+4. метод-перехватчик **`LogUnaryRPCInterceptor`:**
+```go
+func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{},
+	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error)
+```
+  - Перехватчик для логирования информации о каждом gRPC вызове.
+
+  - Измеряет время выполнения вызова и логирует различную информацию о вызове, включая наличие данных в кэше.
+
+  - Если данные найдены в кэше, возвращает их сразу, иначе передает выполнение обработчику.
+
+5.  метод **`StartServer`:**
+```go
+func (es *ExtServer) StartServer(addr, port string) (*grpc.Server, error)
+```
+  - Метод для запуска gRPC сервера.
+
+  - Создает слушатель на указанном адресе и порту.
+
+  - Создает новый экземпляр gRPC сервера с указанными опциями и регистрирует его методы.
+
+  - Запускает сервер в горутине.
+
+  - Возвращает указатель на сервер и ошибку (если есть).
+
+Этот код представляет собой реализацию gRPC-сервиса, взаимодействующего с воркерами через канал и использующего логгирование с использованием библиотеки zap.
+## _**Protobuf file**_ сервиса 
+```protobuf
+syntax = "proto3";
+
+package service;
+
+option go_package = "github.com/EgorKo25/DES/internal/server";
+
+service UserExtensionService  {
+  rpc GetUserExtension(GetRequest) returns (GetResponse);
+}
+
+message GetRequest {
+  UserData user_data = 1;
+}
+
+message GetResponse {
+  string status = 1;
+  UserData users = 2;
+}
+
+message UserData {
+  int32 ids = 1;
+  string name = 2;
+  string email = 3;
+  string phone_number = 4;
+  string date_to = 5;
+  string date_from = 6;
+}
+```
