@@ -104,15 +104,54 @@ type WorkerConfig struct {
             "login": "admin",
             "password": "admin"
         }
-    }
+    
 }
-
 ```
+#### Значения полей:
++ `channel_size` - максимальный размер очереди задач
++ `cache_clear_interval` - интервал очистки кэша
++ `service` - адрес и порт, на которых работает сервис
++ `worker` - 
+  + `max_workers` - максимальное количесвто параллельно работающих воркеров
+  + `timeout_connection` - таймаут подключения к удаленному **HTTP**(0 - keep alive соединение)
+  + `max_time_for_responce` - максимальное время для ответа воркера, если время выйдет, будет отменён контекст
+  + `remote_http_server` - адресс и порт сервера при помощик которого, будут обогощаться данные
+  + `authentication` - данные для аунтефикации на удаленном **HTTP** (передаються в заголовке `Authorization` в **base64**)
 ## [Logger package](https://github.com/EgorKo25/DES/blob/config/internal/logger/logger.go)
 
 Этот пакет предоставляет простой и гибкий механизм логгирования для вашего приложения на основе библиотеки [Zap](https://pkg.go.dev/go.uber.org/zap).
 
 ### Использование
+{
+    "channel_size":20,
+    "cache_clear_interval":20,
+    "service": {
+        "IP": "127.0.0.1",
+        "PORT": ":8080"
+    },
+    "worker": {
+        "_comments": {
+            "description": "this is a configuration for worker pull"
+        },
+        "max_workers": 6,
+        "timeout_connection": 0,
+        "max_time_for_response": 2,
+        "remote_http_server": {
+            "_comments": {
+                "description": "this is a remote http server config"
+            },
+            "IP": "127.0.0.1",
+            "PORT": "4557"
+        },
+        "authentication": {
+            "_comments": {
+                "description": "this is a data for authentication"
+            },
+            "login": "admin",
+            "password": "admin"
+        }
+    }
+}
 
 
 ### Конфигурация логгеров
@@ -151,7 +190,7 @@ type WorkerConfig struct {
    Используйте метод `Search` для поиска данных в кэше:
 
    ```go
-   data, ok := c.Search(title); ok 
+   data, ok := c.Search(title)
    ```
 
 5. **Автоматическая очистка:**
@@ -177,8 +216,15 @@ type ExtServer struct {
   - `grpcLogger`: Еще один экземпляр логгера для логирования событий gRPC, таких как начало и завершение соединения, а также информации о запросах.
 
   - `cache`: Интерфейс `Cacher`, который представляет кэш для хранения данных. Этот интерфейс предоставляет два метода: `Load` для добавления данных в кэш и `Search` для поиска данных по ключу.
-
-2. функция **`NewExtServer`:**
+2. Интерфейс **`Cacher`:**
+```go
+type Cacher interface {
+	Load(title string, data any)
+	Search(title string) (data any, ok bool)
+}
+```
+Интерфейс призван уменьшить связность пакетов и отвязать сервис от конеретной реализации кэширования.
+3. функция **`NewExtServer`:**
 
 ```go
 func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cache Cacher) *ExtServer
@@ -190,7 +236,7 @@ func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cach
 
   - Возвращает указатель на новый экземпляр `ExtServer`.
 
-3. метод-обработчик **`GetUserExtension`:**
+4. метод-обработчик **`GetUserExtension`:**
 ```go
 func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (out *pb.GetResponse, err error)
 ```
@@ -200,7 +246,7 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 
   - Ожидает ответ от воркеров в виде JSON-подобной строки, затем десериализует и возвращает результат. Загружает результат в кэш.
 
-4. метод-перехватчик **`LogUnaryRPCInterceptor`:**
+5. метод-перехватчик **`LogUnaryRPCInterceptor`:**
 ```go
 func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{},
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error)
@@ -211,7 +257,7 @@ func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{}
 
   - Если данные найдены в кэше, возвращает их сразу, иначе передает выполнение обработчику.
 
-5.  метод **`StartServer`:**
+6. метод **`StartServer`:**
 ```go
 func (es *ExtServer) StartServer(addr, port string) (*grpc.Server, error)
 ```
