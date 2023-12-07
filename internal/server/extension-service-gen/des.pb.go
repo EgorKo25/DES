@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.30.0
 // 	protoc        v4.24.3
-// source: proto/proto/des.proto
+// source: server/server/des.server
 
 package extension_service_gen
 
@@ -259,15 +259,15 @@ func file_proto_service_des_proto_rawDescGZIP() []byte {
 
 var file_proto_service_des_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_proto_service_des_proto_goTypes = []interface{}{
-	(*GetRequest)(nil),  // 0: proto.GetRequest
-	(*GetResponse)(nil), // 1: proto.GetResponse
-	(*UserData)(nil),    // 2: proto.UserData
+	(*GetRequest)(nil),  // 0: server.GetRequest
+	(*GetResponse)(nil), // 1: server.GetResponse
+	(*UserData)(nil),    // 2: server.UserData
 }
 var file_proto_service_des_proto_depIdxs = []int32{
-	2, // 0: proto.GetRequest.user_data:type_name -> proto.UserData
-	2, // 1: proto.GetResponse.users:type_name -> proto.UserData
-	0, // 2: proto.UserExtensionService.GetUserExtension:input_type -> proto.GetRequest
-	1, // 3: proto.UserExtensionService.GetUserExtension:output_type -> proto.GetResponse
+	2, // 0: server.GetRequest.user_data:type_name -> server.UserData
+	2, // 1: server.GetResponse.users:type_name -> server.UserData
+	0, // 2: server.UserExtensionService.GetUserExtension:input_type -> server.GetRequest
+	1, // 3: server.UserExtensionService.GetUserExtension:output_type -> server.GetResponse
 	3, // [3:4] is the sub-list for method output_type
 	2, // [2:3] is the sub-list for method input_type
 	2, // [2:2] is the sub-list for extension type_name

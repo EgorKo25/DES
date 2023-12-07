@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.3.0
 // - protoc             v4.24.3
-// source: proto/proto/des.proto
+// source: server/server/des.server
 
 package extension_service_gen
 
@@ -20,10 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	UserExtensionService_GetUserExtension_FullMethodName = "/proto.UserExtensionService/GetUserExtension"
+	UserExtensionService_GetUserExtension_FullMethodName = "/server.UserExtensionService/GetUserExtension"
 )
 
-// UserExtensionServiceClient is the client API for UserExtensionService proto.
+// UserExtensionServiceClient is the client API for UserExtensionService server.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserExtensionServiceClient interface {
@@ -47,7 +47,7 @@ func (c *userExtensionServiceClient) GetUserExtension(ctx context.Context, in *G
 	return out, nil
 }
 
-// UserExtensionServiceServer is the server API for UserExtensionService proto.
+// UserExtensionServiceServer is the server API for UserExtensionService server.
 // All implementations must embed UnimplementedUserExtensionServiceServer
 // for forward compatibility
 type UserExtensionServiceServer interface {
@@ -64,7 +64,7 @@ func (UnimplementedUserExtensionServiceServer) GetUserExtension(context.Context,
 }
 func (UnimplementedUserExtensionServiceServer) mustEmbedUnimplementedUserExtensionServiceServer() {}
 
-// UnsafeUserExtensionServiceServer may be embedded to opt out of forward compatibility for this proto.
+// UnsafeUserExtensionServiceServer may be embedded to opt out of forward compatibility for this server.
 // Use of this interface is not recommended, as added methods to UserExtensionServiceServer will
 // result in compilation errors.
 type UnsafeUserExtensionServiceServer interface {
@@ -93,11 +93,11 @@ func _UserExtensionService_GetUserExtension_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
-// UserExtensionService_ServiceDesc is the grpc.ServiceDesc for UserExtensionService proto.
+// UserExtensionService_ServiceDesc is the grpc.ServiceDesc for UserExtensionService server.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var UserExtensionService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.UserExtensionService",
+	ServiceName: "server.UserExtensionService",
 	HandlerType: (*UserExtensionServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -106,5 +106,5 @@ var UserExtensionService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/proto/des.proto",
+	Metadata: "server/server/des.server",
 }

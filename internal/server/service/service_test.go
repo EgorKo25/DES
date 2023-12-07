@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/EgorKo25/DES/internal/proto/extension-service-gen"
+	pb "github.com/EgorKo25/DES/internal/server/extension-service-gen"
 
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ import (
 func TestExtServer_GetUserExtension(t *testing.T) {
 	channel := make(chan chan []byte, 6)
 	es := NewExtServer(channel)
-	s := es.StartServer(":8080")
+	s, _ := es.StartServer(":8080")
 	{
 		t.Run("Test Canceled Context", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())

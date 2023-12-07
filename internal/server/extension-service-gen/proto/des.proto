@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package service;
 
-option go_package = "github.com/EgorKo25/DES/internal/proto";
+option go_package = "github.com/EgorKo25/DES/internal/server";
 
 service UserExtensionService  {
   rpc GetUserExtension(GetRequest) returns (GetResponse);

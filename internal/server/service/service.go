@@ -3,18 +3,17 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
-	pb "github.com/EgorKo25/DES/internal/proto/extension-service-gen"
+	pb "github.com/EgorKo25/DES/internal/server/extension-service-gen"
 
 	"google.golang.org/grpc"
-
 	"google.golang.org/grpc/codes"
-
 	"google.golang.org/grpc/status"
 )
 
@@ -24,7 +23,6 @@ type ExtServer struct {
 	pb.UnimplementedUserExtensionServiceServer
 	chanLength    int
 	chanMaxLength int
-	mu            sync.Mutex
 }
 
 func NewExtServer(channel chan chan []byte) *ExtServer {
@@ -67,11 +65,11 @@ func (es *ExtServer) LogUnaryRpcInterceptor(ctx context.Context, req interface{}
 
 }
 
-func (es *ExtServer) StartServer(port string) *grpc.Server {
+func (es *ExtServer) StartServer(port string) (*grpc.Server, error) {
 	lis, err := net.Listen("tcp", port)
 
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		return nil, errors.New(fmt.Sprintf("failed to listen: %v", err))
 	}
 	s := grpc.NewServer(
 		grpc.UnaryInterceptor(es.LogUnaryRpcInterceptor),
@@ -84,5 +82,5 @@ func (es *ExtServer) StartServer(port string) *grpc.Server {
 		}
 	}()
 
-	return s
+	return s, nil
 }
