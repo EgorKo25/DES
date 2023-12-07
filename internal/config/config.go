@@ -33,9 +33,10 @@ func NewConfig() (*AppConfig, error) {
 }
 
 type AppConfig struct {
-	WorkerConfig  WorkerConfig  `json:"worker"`
-	ServiceConfig ServiceConfig `json:"service"`
-	ChannelSize   int           `json:"channel_size"`
+	WorkerConfig       WorkerConfig  `json:"worker"`
+	ServiceConfig      ServiceConfig `json:"service"`
+	ChannelSize        int           `json:"queue_task_size"`
+	CacheClearInterval int           `json:"cache_clear_interval"`
 }
 
 type ServiceConfig struct {

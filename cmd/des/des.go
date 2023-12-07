@@ -6,13 +6,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/EgorKo25/DES/internal/server/service"
-	"go.uber.org/zap"
-
+	"github.com/EgorKo25/DES/internal/cache"
 	"github.com/EgorKo25/DES/internal/config"
-
 	"github.com/EgorKo25/DES/internal/logger"
+	"github.com/EgorKo25/DES/internal/server/service"
 	"github.com/EgorKo25/DES/internal/workers"
+
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -28,6 +28,9 @@ func main() {
 			zap.NamedError("error", err),
 		)
 	}
+
+	cacher := cache.NewCache(ctx, cfg.CacheClearInterval)
+	log.Info("cacher init successful")
 
 	channel := make(chan chan []byte, cfg.ChannelSize)
 
@@ -47,6 +50,7 @@ func main() {
 		channel,
 		log,
 		logs["grpc"],
+		cacher,
 	)
 
 	s, err := server.StartServer(cfg.ServiceConfig.IP, cfg.ServiceConfig.PORT)

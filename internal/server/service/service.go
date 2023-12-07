@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -25,13 +24,21 @@ type ExtServer struct {
 
 	logger     *zap.Logger
 	grpcLogger *zap.Logger
+
+	cache Cacher
 }
 
-func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger) *ExtServer {
+type Cacher interface {
+	Load(title string, data any)
+	Search(title string) (data any, ok bool)
+}
+
+func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cache Cacher) *ExtServer {
 	ch = channel
 	return &ExtServer{
 		logger:     logger,
 		grpcLogger: grpcLogger,
+		cache:      cache,
 	}
 }
 
@@ -47,7 +54,6 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 	case ch <- resultChan:
 		resultChan <- data
 	default:
-		log.Println(len(ch), cap(ch))
 		return nil, status.Error(codes.ResourceExhausted, "TOO MANY REQUEST")
 	}
 	select {
@@ -58,6 +64,11 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 		if err = json.Unmarshal(ext, &out); err != nil {
 			return nil, status.Error(codes.Internal, "INTERNAL SERVER ERROR")
 		}
+
+		if es.cache != nil {
+			es.cache.Load(out.Users.Email, out)
+		}
+
 		return out, status.Error(codes.OK, "OK")
 	}
 }
@@ -66,10 +77,18 @@ func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{}
 	_ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 	timeStart := time.Now()
 
-	es.grpcLogger.Info(
-		"grpc connection start",
-		zap.String("grpc request", req.(*pb.GetRequest).String()),
-	)
+	if request := req.(*pb.GetRequest); request.UserData != nil {
+		data, ok := es.cache.Search(request.UserData.Email)
+		es.grpcLogger.Info(
+			"grpc connection start",
+			zap.String("grpc request", request.String()),
+			zap.Bool("cache exist", ok),
+		)
+
+		if ok {
+			return data, status.Error(codes.OK, "OK")
+		}
+	}
 
 	m, err := handler(ctx, req)
 

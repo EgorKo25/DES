@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/EgorKo25/DES/internal/cache"
+
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -24,7 +26,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 	logger := zap.NewExample()
 	creds := insecure.NewCredentials()
 	channel := make(chan chan []byte, 10)
-	es := NewExtServer(channel, logger, logger)
+	es := NewExtServer(channel, logger, logger, cache.NewCache(context.Background(), 3))
 	s, _ := es.StartServer("", ":8080")
 
 	{
@@ -132,7 +134,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 	{
 
 		channel := make(chan chan []byte, 1)
-		es := NewExtServer(channel, logger, logger)
+		es := NewExtServer(channel, logger, logger, cache.NewCache(context.Background(), 3))
 		_, _ = es.StartServer("", ":8080")
 
 		t.Run("Test Too Many Request", func(t *testing.T) {
