@@ -35,6 +35,7 @@ func NewConfig() (*AppConfig, error) {
 type AppConfig struct {
 	WorkerConfig  WorkerConfig  `json:"worker"`
 	ServiceConfig ServiceConfig `json:"service"`
+	ChannelSize   int           `json:"channel_size"`
 }
 
 type ServiceConfig struct {
@@ -43,10 +44,6 @@ type ServiceConfig struct {
 }
 
 type WorkerConfig struct {
-	MaxWorkers         int `json:"max_workers"`
-	MaxTimeForResponse int `json:"max_time_for_response"`
-	TimeoutConnection  int `json:"timeout_connection"`
-
 	RemoteHTTPServer struct {
 		IP   string `json:"IP"`
 		PORT string `json:"PORT"`
@@ -55,4 +52,7 @@ type WorkerConfig struct {
 		Login    string `json:"login"`
 		Password string `json:"password"`
 	} `json:"authentication"`
+	MaxWorkers         int `json:"max_workers"`
+	MaxTimeForResponse int `json:"max_time_for_response"`
+	TimeoutConnection  int `json:"timeout_connection"`
 }
