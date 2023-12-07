@@ -159,7 +159,6 @@ func (wp *WorkerPull) worker(ctx context.Context) {
 
 			a.Reset()
 			cancel()
-		default:
 		}
 	}
 }

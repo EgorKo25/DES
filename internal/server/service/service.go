@@ -84,8 +84,8 @@ func (es *ExtServer) LogUnaryRPCInterceptor(ctx context.Context, req interface{}
 	return m, err
 }
 
-func (es *ExtServer) StartServer(port string) (*grpc.Server, error) {
-	lis, err := net.Listen("tcp", port)
+func (es *ExtServer) StartServer(addr, port string) (*grpc.Server, error) {
+	lis, err := net.Listen("tcp", addr+port)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen: %v", err)
 	}

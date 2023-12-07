@@ -22,16 +22,17 @@ import (
 func TestExtServer_GetUserExtension(t *testing.T) {
 
 	logger := zap.NewExample()
+	creds := insecure.NewCredentials()
 	channel := make(chan chan []byte, 10)
 	es := NewExtServer(channel, logger, logger)
-	s, _ := es.StartServer(":8080")
+	s, _ := es.StartServer("", ":8080")
 
 	{
 
 		t.Run("Test Canceled Context", func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 
-			conn, err := grpc.DialContext(ctx, ":8080", grpc.WithInsecure())
+			conn, err := grpc.DialContext(ctx, ":8080", grpc.WithTransportCredentials(creds))
 			if err != nil {
 				require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
 			}
@@ -91,7 +92,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 
 		ctx := context.Background()
 
-		conn, err := grpc.DialContext(ctx, ":8080", grpc.WithInsecure())
+		conn, err := grpc.DialContext(ctx, ":8080", grpc.WithTransportCredentials(creds))
 		if err != nil {
 			require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
 		}
@@ -132,7 +133,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 
 		channel := make(chan chan []byte, 1)
 		es := NewExtServer(channel, logger, logger)
-		es.StartServer(":8080")
+		_, _ = es.StartServer("", ":8080")
 
 		t.Run("Test Too Many Request", func(t *testing.T) {
 			ctx := context.Background()
@@ -140,7 +141,6 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 			childCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 			defer cancel()
 
-			creds := insecure.NewCredentials()
 			conn, err := grpc.DialContext(ctx, ":8080", grpc.WithTransportCredentials(creds))
 			if err != nil {
 				require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
@@ -149,7 +149,9 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 
 			c := pb.NewUserExtensionServiceClient(conn)
 
-			go c.GetUserExtension(childCtx, &pb.GetRequest{UserData: &pb.UserData{Email: ""}})
+			go func() {
+				_, _ = c.GetUserExtension(childCtx, &pb.GetRequest{UserData: &pb.UserData{Email: ""}})
+			}()
 
 			_, err = c.GetUserExtension(childCtx, &pb.GetRequest{UserData: &pb.UserData{Email: ""}})
 

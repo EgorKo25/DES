@@ -63,7 +63,6 @@ func TestWorkerPull(t *testing.T) {
 	type in struct {
 		resonalId     int
 		authorization Auth
-		channel       chan chan []byte
 		// UserDate
 		email    string
 		dateTo   string
@@ -238,7 +237,7 @@ func NewTestServer() *httptest.Server {
 							"reasonId":%d
 						}
 					]}`, v.Get("personalIds").String(), v.Get("dateFrom").String(), v.Get("dateTo").String(), resonalIds)
-		w.Write([]byte(answ))
+		_, _ = w.Write([]byte(answ))
 	})
 	mux.HandleFunc("/Portal/springApi/api/employees", func(w http.ResponseWriter, r *http.Request) {
 
@@ -280,7 +279,7 @@ func NewTestServer() *httptest.Server {
 								"email":%s,
 								"workPhone":"1234"}
 							]}`, displayName, v.Get("email"))
-		w.Write([]byte(answ))
+		_, _ = w.Write([]byte(answ))
 	})
 
 	server := httptest.NewServer(mux)
