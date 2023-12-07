@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net"
 	"strings"
 	"time"
@@ -35,11 +36,13 @@ type Cacher interface {
 
 func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cache Cacher) *ExtServer {
 	ch = channel
-	return &ExtServer{
+	ext := ExtServer{
 		logger:     logger,
 		grpcLogger: grpcLogger,
 		cache:      cache,
 	}
+
+	return &ext
 }
 
 func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (out *pb.GetResponse, err error) {
@@ -50,6 +53,7 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 		return nil, status.Error(codes.InvalidArgument, "BAD REQUEST")
 	}
 
+	log.Println(es)
 	select {
 	case ch <- resultChan:
 		resultChan <- data
@@ -65,9 +69,7 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 			return nil, status.Error(codes.Internal, "INTERNAL SERVER ERROR")
 		}
 
-		if es.cache != nil {
-			es.cache.Load(out.Users.Email, out)
-		}
+		es.cache.Load(out.Users.Email, out)
 
 		return out, status.Error(codes.OK, "OK")
 	}
@@ -111,7 +113,7 @@ func (es *ExtServer) StartServer(addr, port string) (*grpc.Server, error) {
 	s := grpc.NewServer(
 		grpc.UnaryInterceptor(es.LogUnaryRPCInterceptor),
 	)
-	pb.RegisterUserExtensionServiceServer(s, &ExtServer{})
+	pb.RegisterUserExtensionServiceServer(s, es)
 
 	go func() {
 		if err := s.Serve(lis); err != nil {

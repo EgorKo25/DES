@@ -26,9 +26,9 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 	logger := zap.NewExample()
 	creds := insecure.NewCredentials()
 	channel := make(chan chan []byte, 10)
-	es := NewExtServer(channel, logger, logger, cache.NewCache(context.Background(), 3))
+	caches := cache.NewCache(context.Background(), 3)
+	es := NewExtServer(channel, logger, logger, caches)
 	s, _ := es.StartServer("", ":8080")
-
 	{
 
 		t.Run("Test Canceled Context", func(t *testing.T) {
@@ -67,6 +67,27 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 				name: "Test Internal Server Error",
 				want: want{
 					err: "rpc error: code = Internal desc = INTERNAL SERVER ERROR",
+				},
+			},
+			{
+				name: "Test Success Server Response",
+				enter: enter{
+					ud: &pb.UserData{
+						Email:    "egorko@at.com",
+						DateTo:   "10/20/30",
+						DateFrom: "5/7/9",
+					},
+					dataFromBlackBoxHTTP: `{"status":"OK", "users":{"email":"egorko@at.com","name":"Егор Иванович"}}`,
+				},
+				want: want{
+					code: "OK",
+					err:  "",
+					ud: &pb.UserData{
+						Email:    "egorko@at.com",
+						DateTo:   "10/20/30",
+						DateFrom: "5/7/9",
+						Name:     "Егор Иванович",
+					},
 				},
 			},
 			{
@@ -134,7 +155,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 	{
 
 		channel := make(chan chan []byte, 1)
-		es := NewExtServer(channel, logger, logger, cache.NewCache(context.Background(), 3))
+		es := NewExtServer(channel, logger, logger, caches)
 		_, _ = es.StartServer("", ":8080")
 
 		t.Run("Test Too Many Request", func(t *testing.T) {

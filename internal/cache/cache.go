@@ -6,7 +6,6 @@ import (
 )
 
 func NewCache(ctx context.Context, duration int) *Cache {
-
 	c := &Cache{
 		cache:    make(map[string]any),
 		duration: time.Duration(duration) * time.Second,
@@ -23,9 +22,7 @@ type Cache struct {
 }
 
 func (c *Cache) Load(title string, data any) {
-	if c.cache != nil {
-		c.cache[title] = data
-	}
+	c.cache[title] = data
 }
 
 func (c *Cache) Search(title string) (any, bool) {
