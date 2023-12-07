@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 	logger := zap.NewExample()
 	creds := insecure.NewCredentials()
 	channel := make(chan chan []byte, 10)
-	caches := cache.NewCache(context.Background(), 3)
+	caches := cache.NewCache(context.Background(), 1)
 	es := NewExtServer(channel, logger, logger, caches)
 	s, _ := es.StartServer("", ":8080")
 	{
@@ -37,7 +38,9 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 			if err != nil {
 				require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
 			}
-			defer conn.Close()
+			defer func() {
+				_ = conn.Close()
+			}()
 
 			c := pb.NewUserExtensionServiceClient(conn)
 			cancel()
@@ -90,6 +93,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 				},
 			},
 			{
+				//Этот тестовый блок зависит от предыдущего, так как на предыдущем блоке данные загружаються в кэш
 				name: "Test Success Server Response With Cache",
 				enter: enter{
 					ud: &pb.UserData{
@@ -117,7 +121,9 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 		if err != nil {
 			require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
 		}
-		defer conn.Close()
+		defer func() {
+			_ = conn.Close()
+		}()
 
 		c := pb.NewUserExtensionServiceClient(conn)
 
@@ -128,6 +134,7 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 				childCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
 				defer cancel()
 
+				log.Println(es.cache.Search("egorko@at.com"))
 				//Симуляция ответа стороннего HTTP
 				go func() {
 					result := <-channel
@@ -165,7 +172,9 @@ func TestExtServer_GetUserExtension(t *testing.T) {
 			if err != nil {
 				require.Nil(t, err, fmt.Sprintf("error must to be nil: %s", err))
 			}
-			defer conn.Close()
+			defer func() {
+				_ = conn.Close()
+			}()
 
 			c := pb.NewUserExtensionServiceClient(conn)
 
