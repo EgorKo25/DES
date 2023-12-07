@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -53,7 +52,6 @@ func (es *ExtServer) GetUserExtension(ctx context.Context, in *pb.GetRequest) (o
 		return nil, status.Error(codes.InvalidArgument, "BAD REQUEST")
 	}
 
-	log.Println(es)
 	select {
 	case ch <- resultChan:
 		resultChan <- data
