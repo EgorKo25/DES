@@ -119,7 +119,7 @@ type WorkerConfig struct {
   + `authentication` - данные для аунтефикации на удаленном **HTTP** (передаються в заголовке `Authorization` в **base64**)
 ## [Logger package](https://github.com/EgorKo25/DES/blob/config/internal/logger/logger.go)
 
-Этот пакет предоставляет простой и гибкий механизм логгирования для вашего приложения на основе библиотеки [Zap](https://pkg.go.dev/go.uber.org/zap).
+Этот пакет предоставляет простой и гибкий механизм логгирования на основе библиотеки [Zap](https://pkg.go.dev/go.uber.org/zap).
 
 ### Конфигурация логгера
 
