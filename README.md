@@ -25,7 +25,7 @@
 
 ## ![Typing SVG](https://readme-typing-svg.herokuapp.com?color=%2336BCF7&lines=Что+реализовано+в+проекте?)
 
-## [Config package](https://github.com/EgorKo25/DES/blob/config/internal/config/config.go)
+## [Config package](https://github.com/EgorKo25/DES/blob/main/internal/config/config.go)
 
 ### Описание
 
@@ -117,7 +117,7 @@ type WorkerConfig struct {
   + `max_time_for_responce` - максимальное время для ответа воркера, если время выйдет, будет отменён контекст
   + `remote_http_server` - адресс и порт сервера при помощик которого, будут обогощаться данные
   + `authentication` - данные для аунтефикации на удаленном **HTTP** (передаються в заголовке `Authorization` в **base64**)
-## [Logger package](https://github.com/EgorKo25/DES/blob/config/internal/logger/logger.go)
+## [Logger package](https://github.com/EgorKo25/DES/blob/main/internal/logger/logger.go)
 
 Этот пакет предоставляет простой и гибкий механизм логгирования на основе библиотеки [Zap](https://pkg.go.dev/go.uber.org/zap).
 
@@ -134,7 +134,7 @@ type WorkerConfig struct {
 
 
 Этот пакет предоставляет стандартный способ создания и настройки логгеров в вашем приложении, обеспечивая удобство использования и гибкость в конфигурации.
-## [Cache package](https://github.com/EgorKo25/DES/blob/config/internal/cache/cache.go)
+## [Cache package](https://github.com/EgorKo25/DES/blob/main/internal/cache/cache.go)
 
 Этот пакет предоставляет простой механизм кэширования данных с автоматической очисткой по истечении указанного времени.
 
@@ -163,7 +163,7 @@ type WorkerConfig struct {
 5. **Автоматическая очистка:**
    Кэш автоматически очищается от данных по истечении указанного времени с момента последней загрузки(`duration`). Время указывается при создании кэша.
 
-## [Service package](https://github.com/EgorKo25/DES/blob/config/internal/server/service/service.go)
+## [Service package](https://github.com/EgorKo25/DES/blob/main/internal/server/service/service.go)
 
 Давайте разберем каждую функцию и структуру в вашем коде:
 
