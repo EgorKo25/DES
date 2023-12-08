@@ -28,9 +28,10 @@ func main() {
 			zap.NamedError("error", err),
 		)
 	}
+	log.Info("config was init successful")
 
 	cacher := cache.NewCache(ctx, cfg.CacheClearInterval)
-	log.Info("cacher init successful")
+	log.Info("cache was init successful")
 
 	channel := make(chan chan []byte, cfg.ChannelSize)
 
@@ -44,7 +45,7 @@ func main() {
 		logs["http"],
 	)
 
-	log.Info("worker pull init successful")
+	log.Info("worker pull was init successful")
 
 	server := service.NewExtServer(
 		channel,
