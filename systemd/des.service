@@ -1,14 +1,14 @@
 [Unit]
-Description=DateExtensionService
+Description=Date Extension Service
 After=network.target
 
 [Service]
 Type=simple
 User=des
 Group=des
-OOMScoreAdjust=-100
+OOMScoreAdjust=-1000
 
-ExecStart=/usr/local/bin/DES
+ExecStart=/usr/bin/DES/des -path-to-config app.conf
 Restart=always
 RestartSec=10
 
