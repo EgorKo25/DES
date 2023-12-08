@@ -347,3 +347,21 @@ func (wp *WorkerPull) getAuthorization() string
     - Используется пакет `github.com/enescakir/emoji` для добавления эмоджи в строку в зависимости от `reasonId`.
 
 Этот код представляет собой воркер-пул для обработки запросов. Каждый воркер получает данные из канала, отправляет запросы на указанные URL-ы, обрабатывает ответы и возвращает результаты.
+
+## [Daemon для Systemd](https://github.com/EgorKo25/DES/tree/main/systemd)
+
+### Для того чтобы добавить конфигурацию для **_systemd_**:
+1. Добавьте файл [`systemd/des.service`](https://github.com/EgorKo25/DES/blob/main/systemd/des.service) в `/etc/systemd/system/`
+2. Добавьте папку [`systemd/DES`](https://github.com/EgorKo25/DES/tree/main/systemd/DES) в `/usr/bin`
+### Для того чтобы запустить демон
+```bash
+    sudo systemctl start des.service
+```
+### Для того чтобы остновить демон
+```bash
+    sudo systemctl stop des.service
+```
+### Для того чтобы добавить демон в автозагрузку
+```bash
+    sudo systemctl enable des.service
+```
