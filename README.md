@@ -1,4 +1,4 @@
-# Date Extension Service (DES) 
+# Data Extension Service (DES) 
 
 **Сервис** занимаеться обогощением данных, получаемых по средствам <br> gRPC запросов.
 
