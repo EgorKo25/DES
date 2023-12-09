@@ -1,14 +1,13 @@
 [Unit]
 Description=Date Extension Service
+After=syslog.socket
 After=network.target
 
 [Service]
-Type=simple
-User=des
-Group=des
-OOMScoreAdjust=-1000
+Type=forking
+OOMScoreAdjust=-100
 
-ExecStart=/usr/bin/DES/des -path-to-config app.conf
+ExecStart=/usr/bin/DES/des
 Restart=always
 RestartSec=10
 
