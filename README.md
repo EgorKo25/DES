@@ -20,7 +20,7 @@
     ./des
 ```
 
-Также к проекту приложен `Makefile`
+### Также к проекту приложен `Makefile`
 
 
 ## ![Typing SVG](https://readme-typing-svg.herokuapp.com?color=%2336BCF7&lines=Что+реализовано+в+проекте?)
@@ -145,12 +145,13 @@ type WorkerConfig struct {
    ```go
    c := cache.NewCache(ctx, duration)
    ```
-
+    + _`ctx`_ - контекст в случае отмены которого, будет завершенв очистка кэша.
+    + _`durtion`_ - интервал очистки кэша
 3. **Загрузка данных в кэш:**
    Используйте метод `Load` для добавления данных в кэш:
 
    ```go
-   Load(title, data)
+   c.Load(title, data)
    ```
 
 4. **Поиск данных в кэше:**
@@ -191,7 +192,7 @@ type Cacher interface {
 }
 ```
 Интерфейс призван уменьшить связность пакетов и отвязать сервис от конеретной реализации кэширования.
-3. функция **`NewExtServer`:**
+3. функция-конструктор **`NewExtServer`:**
 
 ```go
 func NewExtServer(channel chan chan []byte, logger, grpcLogger *zap.Logger, cache Cacher) *ExtServer
@@ -273,7 +274,7 @@ message UserData {
 ## [Worker package](https://github.com/EgorKo25/DES/blob/main/internal/workers/worker.go)
 1. Функция-конструктор **`NewWorkerPull`:**
     ```go
-    NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int,
+    func NewWorkerPull(ctx context.Context, channel chan chan []byte, maxWorkers, timeOutConn, maxResponseTime int,
 	login, password string, logger, htpLogger *zap.Logger) *WorkerPull
    ```
     - Инициализирует и возвращает новый экземпляр `WorkerPull`.
@@ -352,7 +353,7 @@ func (wp *WorkerPull) getAuthorization() string
 
 ### Для того чтобы добавить конфигурацию для **_systemd_**:
 1. Добавьте файл [`systemd/des.service`](https://github.com/EgorKo25/DES/blob/main/systemd/des.service) в `/etc/systemd/system/`
-2. Добавьте папку [`systemd/DES`](https://github.com/EgorKo25/DES/tree/main/systemd/DES) в `/usr/bin`
+2. Добавьте папку [`systemd/DES`](https://github.com/EgorKo25/DES/tree/main/systemd/DES) в `/home`
 ### Для того чтобы запустить демон
 ```bash
     sudo systemctl start des.service
